@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary / intermediate build files
+*.tmp
+*.log
+edge_log.txt
+dom.txt
+test_*.woff2
+test_*.ttf
+PlaneSans-test.woff2
+PlaneSans-fixed.woff2
+PlaneSans-cov.woff2
+
+# OS generated files
+.DS_Store
+Thumbs.db
