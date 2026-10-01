@@ -11,7 +11,7 @@
 - `U+0332` Combining Low Line（下線・アンダーライン）
 - `U+0336` Combining Long Stroke Overlay（取り消し線・打消線）
 
-をエディタやブラウザでレンダリングすると、以下の課題が発生します：
+をエディタやブラウザでレンダリングすると、以下の課題が発生することがあります：
 
 1. **文字と文字の間に隙間（ギャップ）が生じ、一本の線として繋がらない**
 2. **文字の高さ（大文字・小文字・漢字・かな）によって線の高さが上下にガタつく（フォールバック位置調整による段差）**
@@ -29,8 +29,10 @@
 - **ファイル**: `PlaneMono.woff2` / `PlaneMono.ttf`
 - **等幅比率**: **半角 600 : 全角 1200**（UPM 1000、UDEV Gothic や 白源 (HackGen) と同一の 1:2 標準比率）
 - **プログラミング用合字 (Ligatures)**:
-  `nanxstats/noto-sans-mono-ligaturized`（Fira Code 由来）を統合。
+  `nanxstats/noto-sans-mono-ligaturized` を統合。
   `=>`, `===`, `!==`, `!=`, `->`, `<-`, `<!--`, `-->`, `::`, `:=`, `>=`, `<=`, `&&`, `||`, `++`, `--` など多数のコード用合字に対応。
+- **特製イースターエッグリガチャ (`>-)-` ✈️ & `-(-<` 🛩️)**:
+  PlaneFont 独自の遊び心として、`>-)-`（東行き・右向き）または `-(-<`（西行き・左向き）と入力すると、4文字分の幅（600 × 4 = 2400）を保ったまま、文字の並び感を残すスリットと4本推進線が入った **4分割のスタイリッシュな飛行機シルエット** に変形します。結合線（下線・上線等）とも共存可能です。
 - **リガチャ × 結合線の両立 (`IgnoreMarks`)**:
   合字ルックアップに `LookupFlag IgnoreMarks` を適用。取り消し線や下線が文字間に挟まれても合字が崩れず、**合字のまま各セルに切れ目なく線が引かれます**（例: `=̶>̶`, `=̶=̶=̶`）。
 - **完全水平描画 (`GPOS`)**:
@@ -124,6 +126,5 @@ python3 build_preview.py
 
 ### 謝辞・ベースプロジェクト
 - **Noto Sans CJK / Noto Sans Mono CJK** (c) Adobe Systems Incorporated, Google LLC
-- **Fira Code** (c) The Fira Code Project Authors
 - **LigaNotoSansMono** (c) Nan Xiao
 - **PlaneFont Modifications** (c) 2026 Motoyuki Oya / PlaneText Project

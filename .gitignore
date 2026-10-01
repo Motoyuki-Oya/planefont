@@ -17,3 +17,6 @@ PlaneSans-cov.woff2
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Local archive (kept on disk, untracked by git)
+archive/

@@ -208,7 +208,7 @@ html_content = f"""<!DOCTYPE html>
     <!-- TAB 1: PlaneMono -->
     <div id="tab-mono">
       <div class="section-card">
-        <h2>1. プログラミング用リガチャ (Programming Ligatures)<span class="tag">Fira Code / LigaNoto</span></h2>
+        <h2>1. プログラミング用リガチャ (Programming Ligatures)<span class="tag">LigaNoto</span></h2>
         <div class="label">アロー・等価演算子・比較演算子・論理演算子</div>
         <div class="sample-box font-mono sample-target">
 =&gt;  -&gt;  &lt;-  &lt;=  &gt;=  ===  !==  !=  ==  &lt;!--  --&gt;  ::  :=  ++  --  &amp;&amp;  ||
@@ -275,6 +275,50 @@ H&#x0336;e&#x0336;l&#x0336;l&#x0336;o&#x0336; W&#x0336;o&#x0336;r&#x0336;l&#x033
 | H̲e̲l̲l̲o̲W̲o̲r̲l̲d̲P̲l̲a̲n̲e̲M̲o̲n̲o̲!̲ |
 | H̶e̶l̶l̶o̶W̶o̶r̶l̶d̶P̶l̶a̶n̶e̶M̶o̶n̶o̶!̶ |
 | ==================== |
+        </div>
+      </div>
+
+      <div class="section-card" style="border: 2px solid #3b82f6; background: linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);">
+        <h2 style="color: #1d4ed8;">✈️ イースターエッグ: 飛行機リガチャ (右向き &gt;-)- &amp; 左向き -(-&lt;)<span class="tag" style="background: #2563eb; color: white;">おまけ機能</span></h2>
+        <div class="subtitle" style="margin-bottom: 12px; color: #4b5563;">
+          4文字のシーケンス <code>&gt;-)-</code> (東行き/右向き) または <code>-(-&lt;</code> (西行き/左向き) を入力すると、等幅グリッドを完全に維持したまま航空機シルエットと4本推進線に変化します。
+        </div>
+
+        <div class="label">単体入力表示 (4文字等幅: 幅2400)</div>
+        <div class="sample-box font-mono sample-target" style="font-size: 36px; letter-spacing: 0; background: white;">
+&gt;-)-    -(-&lt;    &gt;-)-    -(-&lt;
+        </div>
+
+        <div class="label">他のプログラミングリガチャとの混在表示</div>
+        <div class="sample-box font-mono sample-target" style="font-size: 28px; letter-spacing: 0; background: white;">
+=&gt;   -&gt;   &gt;-)-   -(-&lt;   &lt;-   &lt;=   &gt;=   &lt;!--   --&gt;   !=   ===   ::   :=
+        </div>
+
+        <div class="label">等幅グリッド検証（通常文字との横幅完全一致）</div>
+        <div class="code-grid font-mono sample-code-target">
+Flight Out:  &gt;-)-   [HND -&gt; SFO: Heading 090]
+Flight In :  -(-&lt;   [SFO -&gt; HND: Heading 270]
+Align Grid:  1234   [Monospace Width:  2400]
+日本語表示:  羽田   [高度    : 10,668 m]
+        </div>
+
+        <div class="label">実際のコード内でのリガチャ混在スニペット</div>
+        <div class="code-grid font-mono sample-code-target">
+// 航空機テレメトリ・往還ルート制御
+const dispatchFlights = async (routeId: string) =&gt; {{
+  if (status === "ACTIVE" &amp;&amp; altitude &gt;= 35000) {{
+    console.log("Outbound flight: &gt;-)- -&gt; SFO");
+    console.log("Inbound flight : -(-&lt; &lt;- HND");
+    return flights.filter(f =&gt; f.id !== null &amp;&amp; f.active == true);
+  }}
+  // &lt;!-- 待機中: &gt;-)- | -(-&lt; [STANDBY] --&gt;
+  return null;
+}};
+        </div>
+
+        <div class="label">結合線との共存（下線・オーバーライン・取り消し線）</div>
+        <div class="sample-box font-mono sample-target" style="font-size: 30px; background: white;">
+&gt;&#x0332;-&#x0332;)&#x0332;-&#x0332;   -&#x0332;(&#x0332;-&#x0332;&lt;&#x0332;   &gt;&#x0305;-&#x0305;)&#x0305;-&#x0305;   -&#x0305;(&#x0305;-&#x0305;&lt;&#x0305;   &gt;&#x0336;-&#x0336;)&#x0336;-&#x0336;   -&#x0336;(&#x0336;-&#x0336;&lt;&#x0336;
         </div>
       </div>
     </div>
