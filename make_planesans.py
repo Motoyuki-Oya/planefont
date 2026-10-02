@@ -1,35 +1,31 @@
+import io
+import time
 import base64
+import urllib.request
+from pathlib import Path
 from fontTools.ttLib import TTFont
 from fontTools.pens.ttGlyphPen import TTGlyphPen
-from fontTools.subset import Subsetter, Options
+from fontTools.varLib.instancer import instantiateVariableFont
 from fontTools.ttLib.tables import otTables
 
-# 1. Load font
-font = TTFont('/tmp/NotoSansJP-Regular.ttf')
+t_start = time.time()
+print("1. Preparing NotoSansJP source font...")
+src_path = Path('/tmp/NotoSansJP-wght.ttf')
+if not src_path.exists():
+    print("Downloading NotoSansJP[wght].ttf from Google Fonts...")
+    url = 'https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf'
+    urllib.request.urlretrieve(url, str(src_path))
 
-sample_text = (
-    "Hello World"
-    "平均値あいうえお"
-    "下線テスト"
-    "削除済みテキストー"
-    " "
-    "　"
-)
-sample_cps = set(ord(c) for c in sample_text)
-sample_cps.update([0x0305, 0x0332, 0x0336])
+print("2. Instantiating static Regular (wght=400)...")
+var_font = TTFont(str(src_path))
+font = instantiateVariableFont(var_font, {'wght': 400})
 
-options = Options()
-options.layout_features = ['*']
-options.name_IDs = ['*']
-subsetter = Subsetter(options=options)
-subsetter.populate(unicodes=sample_cps)
-subsetter.subset(font)
-
+# Remove variable font specific tables to ensure pure static TrueType font
 for tag in ['gvar', 'HVAR', 'VVAR', 'MVAR', 'vhea', 'vmtx', 'BASE', 'STAT', 'avar', 'fvar', 'gasp']:
     if tag in font:
         del font[tag]
 
-import io
+# Re-serialize to clean internal structures
 buf = io.BytesIO()
 font.save(buf)
 buf.seek(0)
@@ -38,31 +34,34 @@ font = TTFont(buf)
 glyf = font['glyf']
 hmtx = font['hmtx']
 cmap = font.getBestCmap()
-glyph_order = font.getGlyphOrder()
+glyph_order = list(font.getGlyphOrder())
 os2 = font['OS/2']
 
-ascender = os2.sTypoAscender   # 880
+ascender = os2.sTypoAscender       # 880
 strikeout = os2.yStrikeoutPosition # 325
-underline = font['post'].underlinePosition # -125
+underline = font['post'].underlinePosition if 'post' in font else -125 # -125
 thickness = 50
 
-# Collect unique widths of all base characters in sample_text
-# For each unique width, create a custom-fitted mark line from [-width, 0]
+print(f"Loaded {len(glyph_order)} glyphs ({len(cmap)} cmap entries).")
+
+# 3. Analyze character widths across all base glyphs
+print("3. Analyzing character widths across all glyphs...")
 base_glyphs = {}
 unique_widths = set()
 
-for char in sample_text:
-    cp = ord(char)
-    gn = cmap.get(cp)
-    if gn:
-        w, lsb = hmtx.metrics[gn]
+for gn in glyph_order:
+    if gn == '.notdef':
+        continue
+    w, lsb = hmtx.metrics.get(gn, (1000, 0))
+    if w > 0:
         base_glyphs[gn] = w
         unique_widths.add(w)
 
-print(f"Unique character widths in text: {sorted(unique_widths)}")
+sorted_widths = sorted(unique_widths)
+print(f"Found {len(sorted_widths)} unique character widths: min={sorted_widths[0]}, max={sorted_widths[-1]}")
 
-# Create combining marks for each mark type and each width
-# E.g. uni0305.w733 for width 733, drawn exactly from -733 to 0!
+# 4. Generate width-fitted combining marks
+print("4. Generating width-fitted combining marks (Overline, Underline, Strikeout)...")
 mark_types = [
     (0x0305, 'uni0305', ascender, 'overline'),
     (0x0332, 'uni0332', underline, 'underline'),
@@ -71,15 +70,14 @@ mark_types = [
 
 created_mark_names = set()
 
-for w in unique_widths:
+for w in sorted_widths:
     for cp, default_name, y_pos, tag in mark_types:
-        # Default mark is 1000 width
         if w == 1000:
             m_name = default_name
         else:
             m_name = f"{default_name}.w{w}"
         
-        pen = TTGlyphPen(glyf)
+        pen = TTGlyphPen(None)
         pen.moveTo((-w, y_pos))
         pen.lineTo((0, y_pos))
         pen.lineTo((0, y_pos + thickness))
@@ -101,10 +99,8 @@ for cp, default_name, _, _ in mark_types:
 font.setGlyphOrder(glyph_order)
 glyf.glyphOrder = list(glyph_order)
 
-# Build contextual substitution in GSUB:
-# When base glyph with width W is followed by default mark,
-# substitute default mark with the exact fitted mark for width W!
-
+# 5. Build OpenType GSUB contextual substitution
+print("5. Configuring GSUB contextual substitutions for exact width matching...")
 if 'GSUB' not in font:
     from fontTools.ttLib.tables.G_S_U_B_ import table_G_S_U_B_
     font['GSUB'] = table_G_S_U_B_()
@@ -119,12 +115,12 @@ if 'GSUB' not in font:
 
 gsub = font['GSUB'].table
 
-# Create SingleSubst lookups for each width < 1000
+# Create SingleSubst lookup for each width != 1000
 width_to_lookup_idx = {}
 
-for w in unique_widths:
+for w in sorted_widths:
     if w == 1000:
-        continue # default mark is already 1000
+        continue
     
     sub_table = otTables.SingleSubst()
     sub_table.mapping = {}
@@ -141,22 +137,26 @@ for w in unique_widths:
     gsub.LookupList.Lookup.append(l)
     width_to_lookup_idx[w] = idx
 
-# Now create ChainContextSubst:
-# Group base glyphs by width:
+# Group base glyphs by width
 glyphs_by_width = {}
 for gn, w in base_glyphs.items():
     glyphs_by_width.setdefault(w, []).append(gn)
 
 chain_subtables = []
-for w, b_glyphs in glyphs_by_width.items():
+glyph_to_id = {gn: i for i, gn in enumerate(glyph_order)}
+
+for w in sorted_widths:
     if w == 1000:
+        continue
+    b_glyphs = glyphs_by_width.get(w, [])
+    if not b_glyphs:
         continue
     l_idx = width_to_lookup_idx[w]
     
     chain = otTables.ChainContextSubst()
     chain.Format = 3
     chain.BacktrackCoverage = [otTables.Coverage()]
-    chain.BacktrackCoverage[0].glyphs = b_glyphs
+    chain.BacktrackCoverage[0].glyphs = sorted(b_glyphs, key=lambda gn: glyph_to_id.get(gn, 0))
     chain.BacktrackGlyphCount = 1
     
     chain.InputCoverage = [otTables.Coverage()]
@@ -183,7 +183,7 @@ main_chain_lookup.SubTableCount = len(chain_subtables)
 main_chain_idx = len(gsub.LookupList.Lookup)
 gsub.LookupList.Lookup.append(main_chain_lookup)
 
-# Register main_chain_idx in 'calt' and 'ccmp' for all scripts
+# Register main_chain_idx in calt and ccmp
 def register_feature(tag, l_idx):
     feat = otTables.Feature()
     feat.FeatureParams = None
@@ -220,7 +220,8 @@ def register_feature(tag, l_idx):
 register_feature('calt', main_chain_idx)
 register_feature('ccmp', main_chain_idx)
 
-# GDEF table with GlyphClassDef (Mark = 3) for ALL mark glyphs
+# 6. GDEF configuration
+print("6. Configuring GDEF table...")
 if 'GDEF' not in font:
     from fontTools.ttLib.tables.G_D_E_F_ import table_G_D_E_F_
     font['GDEF'] = table_G_D_E_F_()
@@ -237,20 +238,29 @@ for gn in font.getGlyphOrder():
         classes[gn] = 1 # Base glyph
 gdef.GlyphClassDef.classDefs = classes
 
+# 7. Update Name table to PlaneSans Regular
+print("7. Updating font metadata to PlaneSans Regular...")
+name_table = font['name']
+for r in name_table.names:
+    if r.nameID == 1: # Family
+        r.string = "PlaneSans"
+    elif r.nameID == 2: # Subfamily
+        r.string = "Regular"
+    elif r.nameID == 4: # Full Name
+        r.string = "PlaneSans Regular"
+    elif r.nameID == 6: # PostScript Name
+        r.string = "PlaneSans-Regular"
+
+# 8. Save TTF and WOFF2
+print("8. Saving PlaneSans.ttf and PlaneSans.woff2...")
+out_ttf = Path('/mnt/c/workspace/planefont/PlaneSans.ttf')
+out_woff2 = Path('/mnt/c/workspace/planefont/PlaneSans.woff2')
+
+font.flavor = None
+font.save(str(out_ttf))
+
 font.flavor = 'woff2'
-font.save('/mnt/c/workspace/planefont/PlaneSans.woff2')
+font.save(str(out_woff2))
 
-with open('/mnt/c/workspace/planefont/PlaneSans.woff2', 'rb') as f:
-    woff2_b64 = base64.b64encode(f.read()).decode('ascii')
-
-with open('/mnt/c/workspace/planefont/preview.html', 'r', encoding='utf-8') as f:
-    html = f.read()
-
-import re
-new_src = f"url('data:font/woff2;charset=utf-8;base64,{woff2_b64}') format('woff2')"
-html = re.sub(r"url\([^)]+\)\s*format\('[^']+'\)", new_src, html)
-
-with open('/mnt/c/workspace/planefont/preview.html', 'w', encoding='utf-8') as f:
-    f.write(html)
-
-print("SUCCESS: Exact per-character-width contextual mark font generated and deployed!")
+t_end = time.time()
+print(f"Successfully generated PlaneSans (Full Japanese Regular) in {t_end - t_start:.2f}s!")

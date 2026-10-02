@@ -111,7 +111,7 @@ pip install fonttools brotli uharfbuzz opentype-sanitizer
 python3 make_planemono.py
 
 # プロポーショナル版 PlaneSans の生成 (.woff2 / .ttf)
-python3 fit_widths.py
+python3 make_planesans.py
 
 # プレビューHTMLの生成・更新
 python3 build_preview.py
